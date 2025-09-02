@@ -1,6 +1,6 @@
 # Universal MerkleSync
 
-A language-agnostic, universal synchronization library for any database, enabling secure, proof-driven, offline-first capabilities for edge clients.
+A ideally language-agnostic, universal synchronization library for any database, enabling secure, proof-driven, offline-first capabilities for edge clients.
 
 ## Overview
 
