@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package merklesync;
+
+option go_package = "universal-merkle-sync/proto";
+
+// MerkleSync service definition
+service MerkleSync {
+  // Submit encrypted data block for Merkle tree construction
+  rpc SubmitBlock(SubmitBlockRequest) returns (SubmitBlockResponse);
+  
+  // Get current Merkle root
+  rpc GetMerkleRoot(GetMerkleRootRequest) returns (GetMerkleRootResponse);
+  
+  // Generate Merkle proof for specific leaf hashes
+  rpc GenerateProof(GenerateProofRequest) returns (GenerateProofResponse);
+  
+  // Verify Merkle proof
+  rpc VerifyProof(VerifyProofRequest) returns (VerifyProofResponse);
+  
+  // Get tree differences between two roots
+  rpc DiffTrees(DiffTreesRequest) returns (DiffTreesResponse);
+
+  // Sync data blocks from the server
+  rpc SyncData(SyncDataRequest) returns (stream DataBlock);
+}
+
+// Data block with encryption
+message DataBlock {
+  string id = 1;
+  bytes encrypted_data = 2;
+  string table_name = 3;
+  string operation = 4; // INSERT, UPDATE, DELETE
+  int64 timestamp = 5;
+  map<string, string> metadata = 6;
+}
+
+// Submit block request
+message SubmitBlockRequest {
+  DataBlock block = 1;
+}
+
+// Submit block response
+message SubmitBlockResponse {
+  bytes merkle_root = 1;
+  bytes leaf_hash = 2;
+  bool success = 3;
+  string error_message = 4;
+}
+
+// Get Merkle root request
+message GetMerkleRootRequest {
+  string table_name = 1; // Optional: filter by table
+}
+
+// Get Merkle root response
+message GetMerkleRootResponse {
+  string merkle_root = 1;
+  int64 block_count = 2;
+  int64 timestamp = 3;
+}
+
+// Generate proof request
+message GenerateProofRequest {
+  string merkle_root = 1;
+  repeated string leaf_hashes = 2;
+}
+
+// Merkle proof node
+message ProofNode {
+  string hash = 1;
+  bool is_left = 2; // true if this is a left child, false if right
+}
+
+// Generate proof response
+message GenerateProofResponse {
+  repeated ProofNode proof_path = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+// Verify proof request
+message VerifyProofRequest {
+  string merkle_root = 1;
+  repeated string leaf_hashes = 2;
+  repeated ProofNode proof_path = 3;
+}
+
+// Verify proof response
+message VerifyProofResponse {
+  bool valid = 1;
+  string error_message = 2;
+}
+
+// Tree difference node
+message DiffNode {
+  string hash = 1;
+  bool is_leaf = 2;
+  repeated DiffNode children = 3;
+  DataBlock block = 4; // Only present for leaf nodes
+}
+
+// Diff trees request
+message DiffTreesRequest {
+  string root_hash_1 = 1;
+  string root_hash_2 = 2;
+}
+
+// Diff trees response
+message DiffTreesResponse {
+  bool success = 1;
+  string error_message = 2;
+  repeated DiffNode differences = 3;
+}
+
+// Sync data request
+message SyncDataRequest {
+  string table_name = 1; // Optional: filter by table name
+}

@@ -1,0 +1,104 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: merklesync
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d merklesync"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB database
+  mongodb:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MerkleSync gRPC server
+  merklesync-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "50051:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      - GRPC_PORT=50051
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 50051 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL connector
+  postgresql-connector:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgresql-connector
+    depends_on:
+      postgres:
+        condition: service_healthy
+      merklesync-server:
+        condition: service_healthy
+    environment:
+      - POSTGRES_CONNECTION_STRING=postgres://user:password@postgres:5432/merklesync?sslmode=disable
+      - GRPC_SERVER=merklesync-server:50051
+    restart: unless-stopped
+
+  # MongoDB connector
+  mongodb-connector:
+    build:
+      context: .
+      dockerfile: Dockerfile.mongodb-connector
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      merklesync-server:
+        condition: service_healthy
+    environment:
+      - MONGODB_CONNECTION_STRING=mongodb://root:password@mongodb:27017
+      - MONGODB_DATABASE=merklesync
+      - GRPC_SERVER=merklesync-server:50051
+    restart: unless-stopped
+
+  # Edge client demo
+  edge-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.edge-client
+    depends_on:
+      merklesync-server:
+        condition: service_healthy
+    environment:
+      - GRPC_SERVER=merklesync-server:50051
+      - CACHE_DIR=/app/cache
+    volumes:
+      - edge_cache:/app/cache
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  edge_cache:
